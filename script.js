@@ -11,6 +11,7 @@ let localTracks = [];
 let remoteUsers = {};
 let isModerator = false;
 let isFirstUser = false;
+let connectionTime = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("join-btn").addEventListener("click", joinCall);
@@ -71,17 +72,8 @@ async function joinCall() {
         await client.join(config.appId, config.channel, config.token, config.uid);
         console.log("Connexion au canal réussie");
 
-        // Vérifier si on est le premier utilisateur
-        if (Object.keys(remoteUsers).length === 0) {
-            isFirstUser = true;
-            isModerator = true;
-            document.getElementById('moderator-controls').style.display = 'flex';
-            console.log("Premier utilisateur - devenu modérateur");
-        } else {
-            isModerator = false;
-            document.getElementById('moderator-controls').style.display = 'none';
-            console.log("Utilisateur est participant");
-        }
+        // Enregistrer le temps de connexion
+        connectionTime = Date.now();
 
         // Initialiser les tracks immédiatement
         await initializeTracks();
@@ -146,9 +138,16 @@ function updateUI() {
 async function handleUserJoined(user) {
     console.log("Nouvel utilisateur rejoint:", user.uid);
 
-    // Si on est le modérateur, on ajoute les contrôles pour le nouvel utilisateur
-    if (isModerator) {
-        addModeratorControl(user.uid);
+    // Si on est le premier utilisateur (basé sur le temps de connexion)
+    if (!isFirstUser && connectionTime < user.uid) {
+        isFirstUser = true;
+        isModerator = true;
+        document.getElementById('moderator-controls').style.display = 'flex';
+        console.log("Premier utilisateur - devenu modérateur");
+    } else {
+        isModerator = false;
+        document.getElementById('moderator-controls').style.display = 'none';
+        console.log("Utilisateur est participant");
     }
 }
 
