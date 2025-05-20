@@ -10,8 +10,6 @@ let client;
 let localTracks = [];
 let remoteUsers = {};
 let isModerator = false;
-let isFirstUser = false;
-let hasModerator = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("join-btn").addEventListener("click", joinCall);
@@ -72,10 +70,9 @@ async function joinCall() {
         await client.join(config.appId, config.channel, config.token, config.uid);
         console.log("Connexion au canal réussie");
 
-        // Si aucun modérateur n'existe, on devient modérateur
-        if (!hasModerator) {
+        // Vérifier si on est le premier utilisateur
+        if (Object.keys(remoteUsers).length === 0) {
             isModerator = true;
-            hasModerator = true;
             document.getElementById('moderator-controls').style.display = 'flex';
             console.log("Premier utilisateur - devenu modérateur");
         } else {
@@ -161,13 +158,11 @@ async function handleUserPublished(user, mediaType) {
         if (mediaType === "video") {
             addVideoStream(user);
             user.videoTrack.play(`user-${user.uid}`);
-            // Stocker la référence à la track vidéo
             user.remoteVideoTrack = user.videoTrack;
         }
 
         if (mediaType === "audio") {
             user.audioTrack.play();
-            // Stocker la référence à la track audio
             user.remoteAudioTrack = user.audioTrack;
         }
 
@@ -191,11 +186,6 @@ function handleUserUnpublished(user) {
 
 async function handleUserLeft(user) {
     console.log("Utilisateur parti:", user.uid);
-
-    // Si le modérateur part, on réinitialise hasModerator
-    if (isModerator && user.uid === config.uid) {
-        hasModerator = false;
-    }
 
     const el = document.getElementById(`user-${user.uid}`);
     if (el) el.remove();
@@ -391,11 +381,6 @@ async function kickUser(uid) {
 }
 
 async function leaveCall() {
-    // Si on est le modérateur, on réinitialise hasModerator
-    if (isModerator) {
-        hasModerator = false;
-    }
-
     for (let track of localTracks) {
         track.stop();
         track.close();
