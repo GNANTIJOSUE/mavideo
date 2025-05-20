@@ -10,8 +10,7 @@ let client;
 let localTracks = [];
 let remoteUsers = {};
 let isModerator = false;
-let isFirstUser = false;
-let connectionTime = null;
+let hasModerator = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("join-btn").addEventListener("click", joinCall);
@@ -72,19 +71,6 @@ async function joinCall() {
         await client.join(config.appId, config.channel, config.token, config.uid);
         console.log("Connexion au canal réussie");
 
-        // Vérifier si on est le premier utilisateur
-        const users = await client.getRemoteUsers();
-        if (users.length === 0) {
-            isFirstUser = true;
-            isModerator = true;
-            document.getElementById('moderator-controls').style.display = 'flex';
-            console.log("Premier utilisateur - devenu modérateur");
-        } else {
-            isModerator = false;
-            document.getElementById('moderator-controls').style.display = 'none';
-            console.log("Utilisateur est participant");
-        }
-
         // Initialiser les tracks immédiatement
         await initializeTracks();
 
@@ -103,6 +89,19 @@ function setupEventHandlers() {
     client.on("user-joined", handleUserJoined);
     client.on("connection-state-change", (curState, prevState) => {
         console.log("État de la connexion:", prevState, "->", curState);
+        if (curState === "CONNECTED") {
+            // Si on est le premier à se connecter
+            if (!hasModerator) {
+                isModerator = true;
+                hasModerator = true;
+                document.getElementById('moderator-controls').style.display = 'flex';
+                console.log("Premier utilisateur - devenu modérateur");
+            } else {
+                isModerator = false;
+                document.getElementById('moderator-controls').style.display = 'none';
+                console.log("Utilisateur est participant");
+            }
+        }
     });
 }
 
@@ -190,6 +189,11 @@ function handleUserUnpublished(user) {
 
 async function handleUserLeft(user) {
     console.log("Utilisateur parti:", user.uid);
+
+    // Si le modérateur part, réinitialiser hasModerator
+    if (isModerator) {
+        hasModerator = false;
+    }
 
     // Supprimer les contrôles du modérateur
     const userControlDiv = document.getElementById(`user-control-${user.uid}`);
@@ -373,6 +377,11 @@ async function kickUser(uid) {
 }
 
 async function leaveCall() {
+    // Si on est le modérateur, réinitialiser hasModerator
+    if (isModerator) {
+        hasModerator = false;
+    }
+
     for (let track of localTracks) {
         track.stop();
         track.close();
