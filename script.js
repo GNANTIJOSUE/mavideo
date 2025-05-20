@@ -72,8 +72,18 @@ async function joinCall() {
         await client.join(config.appId, config.channel, config.token, config.uid);
         console.log("Connexion au canal réussie");
 
-        // Enregistrer le temps de connexion
-        connectionTime = Date.now();
+        // Vérifier si on est le premier utilisateur
+        const users = await client.getRemoteUsers();
+        if (users.length === 0) {
+            isFirstUser = true;
+            isModerator = true;
+            document.getElementById('moderator-controls').style.display = 'flex';
+            console.log("Premier utilisateur - devenu modérateur");
+        } else {
+            isModerator = false;
+            document.getElementById('moderator-controls').style.display = 'none';
+            console.log("Utilisateur est participant");
+        }
 
         // Initialiser les tracks immédiatement
         await initializeTracks();
@@ -138,16 +148,9 @@ function updateUI() {
 async function handleUserJoined(user) {
     console.log("Nouvel utilisateur rejoint:", user.uid);
 
-    // Si on est le premier utilisateur (basé sur le temps de connexion)
-    if (!isFirstUser && connectionTime < user.uid) {
-        isFirstUser = true;
-        isModerator = true;
-        document.getElementById('moderator-controls').style.display = 'flex';
-        console.log("Premier utilisateur - devenu modérateur");
-    } else {
-        isModerator = false;
-        document.getElementById('moderator-controls').style.display = 'none';
-        console.log("Utilisateur est participant");
+    // Si on est le modérateur, on ajoute les contrôles pour le nouvel utilisateur
+    if (isModerator) {
+        addModeratorControl(user.uid);
     }
 }
 
