@@ -10,8 +10,8 @@ let client;
 let localTracks = [];
 let remoteUsers = {};
 let isModerator = false;
-let dataChannel;
 let isFirstUser = false;
+let hasModerator = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("join-btn").addEventListener("click", joinCall);
@@ -72,13 +72,17 @@ async function joinCall() {
         await client.join(config.appId, config.channel, config.token, config.uid);
         console.log("Connexion au canal réussie");
 
-        // Envoyer un message pour vérifier si on est le premier
-        await client.sendChannelMessage({
-            message: JSON.stringify({
-                type: 'check_moderator',
-                uid: config.uid
-            })
-        });
+        // Si aucun modérateur n'existe, on devient modérateur
+        if (!hasModerator) {
+            isModerator = true;
+            hasModerator = true;
+            document.getElementById('moderator-controls').style.display = 'flex';
+            console.log("Premier utilisateur - devenu modérateur");
+        } else {
+            isModerator = false;
+            document.getElementById('moderator-controls').style.display = 'none';
+            console.log("Utilisateur est participant");
+        }
 
         // Initialiser les tracks immédiatement
         await initializeTracks();
@@ -99,7 +103,6 @@ function setupEventHandlers() {
     client.on("connection-state-change", (curState, prevState) => {
         console.log("État de la connexion:", prevState, "->", curState);
     });
-    client.on("channel-message", handleChannelMessage);
 }
 
 async function initializeTracks() {
@@ -141,8 +144,13 @@ function updateUI() {
     document.querySelector('.control-buttons').prepend(roleIndicator);
 }
 
-function handleUserJoined(user) {
+async function handleUserJoined(user) {
     console.log("Nouvel utilisateur rejoint:", user.uid);
+
+    // Si on est le modérateur, on ajoute les contrôles pour le nouvel utilisateur
+    if (isModerator) {
+        addModeratorControl(user.uid);
+    }
 }
 
 async function handleUserPublished(user, mediaType) {
@@ -181,7 +189,14 @@ function handleUserUnpublished(user) {
     updateUserCount();
 }
 
-function handleUserLeft(user) {
+async function handleUserLeft(user) {
+    console.log("Utilisateur parti:", user.uid);
+
+    // Si le modérateur part, on réinitialise hasModerator
+    if (isModerator && user.uid === config.uid) {
+        hasModerator = false;
+    }
+
     const el = document.getElementById(`user-${user.uid}`);
     if (el) el.remove();
     delete remoteUsers[user.uid];
@@ -375,52 +390,10 @@ async function kickUser(uid) {
     }
 }
 
-async function handleChannelMessage(sender, message) {
-    try {
-        const data = JSON.parse(message);
-
-        if (data.type === 'check_moderator') {
-            // Si on est le premier à recevoir ce message, on devient modérateur
-            if (!isFirstUser) {
-                isFirstUser = true;
-                isModerator = true;
-                document.getElementById('moderator-controls').style.display = 'flex';
-                console.log("Premier utilisateur - devenu modérateur");
-
-                // Informer les autres que nous sommes le modérateur
-                await client.sendChannelMessage({
-                    message: JSON.stringify({
-                        type: 'moderator_assigned',
-                        moderatorUid: config.uid
-                    })
-                });
-            }
-        } else if (data.type === 'moderator_assigned') {
-            // Si quelqu'un d'autre est déjà modérateur
-            if (data.moderatorUid !== config.uid) {
-                isModerator = false;
-                document.getElementById('moderator-controls').style.display = 'none';
-                console.log("Utilisateur est participant");
-            }
-        }
-    } catch (error) {
-        console.error("Erreur lors du traitement du message:", error);
-    }
-}
-
 async function leaveCall() {
-    // Si on est modérateur, informer les autres
+    // Si on est le modérateur, on réinitialise hasModerator
     if (isModerator) {
-        try {
-            await client.sendChannelMessage({
-                message: JSON.stringify({
-                    type: 'moderator_left',
-                    uid: config.uid
-                })
-            });
-        } catch (error) {
-            console.error("Erreur lors de l'envoi du message de déconnexion:", error);
-        }
+        hasModerator = false;
     }
 
     for (let track of localTracks) {
