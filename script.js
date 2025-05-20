@@ -74,6 +74,18 @@ async function joinCall() {
         // Initialiser les tracks immédiatement
         await initializeTracks();
 
+        // Si on est le premier à se connecter
+        if (!hasModerator) {
+            isModerator = true;
+            hasModerator = true;
+            document.getElementById('moderator-controls').style.display = 'flex';
+            console.log("Premier utilisateur - devenu modérateur");
+        } else {
+            isModerator = false;
+            document.getElementById('moderator-controls').style.display = 'none';
+            console.log("Utilisateur est participant");
+        }
+
     } catch (error) {
         console.error("Erreur lors de la connexion:", error);
         alert("Erreur lors de la connexion: " + error.message);
@@ -87,22 +99,6 @@ function setupEventHandlers() {
     client.on("user-unpublished", handleUserUnpublished);
     client.on("user-left", handleUserLeft);
     client.on("user-joined", handleUserJoined);
-    client.on("connection-state-change", (curState, prevState) => {
-        console.log("État de la connexion:", prevState, "->", curState);
-        if (curState === "CONNECTED") {
-            // Si on est le premier à se connecter
-            if (!hasModerator) {
-                isModerator = true;
-                hasModerator = true;
-                document.getElementById('moderator-controls').style.display = 'flex';
-                console.log("Premier utilisateur - devenu modérateur");
-            } else {
-                isModerator = false;
-                document.getElementById('moderator-controls').style.display = 'none';
-                console.log("Utilisateur est participant");
-            }
-        }
-    });
 }
 
 async function initializeTracks() {
