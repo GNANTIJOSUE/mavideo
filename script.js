@@ -10,7 +10,7 @@ let client;
 let localTracks = [];
 let remoteUsers = {};
 let isModerator = false;
-let hasModerator = false;
+let connectionAttemptTime = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("join-btn").addEventListener("click", joinCall);
@@ -39,6 +39,21 @@ async function checkCameraPermissions() {
     }
 }
 
+async function cleanupResources() {
+    if (localTracks) {
+        for (let track of localTracks) {
+            track.stop();
+            track.close();
+        }
+        localTracks = [];
+    }
+    if (client) {
+        await client.leave();
+    }
+    remoteUsers = {};
+    updateUserCount();
+}
+
 async function joinCall() {
     try {
         if (typeof AgoraRTC === 'undefined') {
@@ -59,6 +74,9 @@ async function joinCall() {
 
         document.getElementById("join-btn").disabled = true;
 
+        // Enregistrer le moment de la tentative de connexion
+        connectionAttemptTime = Date.now();
+
         // Création du client
         client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         console.log("Client Agora créé avec succès");
@@ -74,18 +92,6 @@ async function joinCall() {
         // Initialiser les tracks immédiatement
         await initializeTracks();
 
-        // Si on est le premier à se connecter
-        if (!hasModerator) {
-            isModerator = true;
-            hasModerator = true;
-            document.getElementById('moderator-controls').style.display = 'flex';
-            console.log("Premier utilisateur - devenu modérateur");
-        } else {
-            isModerator = false;
-            document.getElementById('moderator-controls').style.display = 'none';
-            console.log("Utilisateur est participant");
-        }
-
     } catch (error) {
         console.error("Erreur lors de la connexion:", error);
         alert("Erreur lors de la connexion: " + error.message);
@@ -99,6 +105,25 @@ function setupEventHandlers() {
     client.on("user-unpublished", handleUserUnpublished);
     client.on("user-left", handleUserLeft);
     client.on("user-joined", handleUserJoined);
+    client.on("connection-state-change", (curState, prevState) => {
+        console.log("État de la connexion:", prevState, "->", curState);
+        if (curState === "CONNECTED") {
+            // Attendre un court délai pour voir si d'autres utilisateurs sont déjà connectés
+            setTimeout(() => {
+                if (Object.keys(remoteUsers).length === 0) {
+                    // Si aucun autre utilisateur n'est connecté, on est le premier
+                    isModerator = true;
+                    document.getElementById('moderator-controls').style.display = 'flex';
+                    console.log("Premier utilisateur - devenu modérateur");
+                } else {
+                    // Si d'autres utilisateurs sont déjà connectés, on est un participant
+                    isModerator = false;
+                    document.getElementById('moderator-controls').style.display = 'none';
+                    console.log("Utilisateur est participant");
+                }
+            }, 1000); // Attendre 1 seconde pour voir si d'autres utilisateurs se connectent
+        }
+    });
 }
 
 async function initializeTracks() {
@@ -142,11 +167,6 @@ function updateUI() {
 
 async function handleUserJoined(user) {
     console.log("Nouvel utilisateur rejoint:", user.uid);
-
-    // Si on est le modérateur, on ajoute les contrôles pour le nouvel utilisateur
-    if (isModerator) {
-        addModeratorControl(user.uid);
-    }
 }
 
 async function handleUserPublished(user, mediaType) {
@@ -185,11 +205,6 @@ function handleUserUnpublished(user) {
 
 async function handleUserLeft(user) {
     console.log("Utilisateur parti:", user.uid);
-
-    // Si le modérateur part, réinitialiser hasModerator
-    if (isModerator) {
-        hasModerator = false;
-    }
 
     // Supprimer les contrôles du modérateur
     const userControlDiv = document.getElementById(`user-control-${user.uid}`);
@@ -373,11 +388,6 @@ async function kickUser(uid) {
 }
 
 async function leaveCall() {
-    // Si on est le modérateur, réinitialiser hasModerator
-    if (isModerator) {
-        hasModerator = false;
-    }
-
     for (let track of localTracks) {
         track.stop();
         track.close();
