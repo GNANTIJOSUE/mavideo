@@ -188,6 +188,12 @@ function handleUserUnpublished(user) {
 async function handleUserLeft(user) {
     console.log("Utilisateur parti:", user.uid);
 
+    // Supprimer les contrôles du modérateur
+    const userControlDiv = document.getElementById(`user-control-${user.uid}`);
+    if (userControlDiv) {
+        userControlDiv.remove();
+    }
+
     const el = document.getElementById(`user-${user.uid}`);
     if (el) el.remove();
     delete remoteUsers[user.uid];
@@ -294,22 +300,13 @@ async function toggleRemoteUserMic(uid) {
     const user = remoteUsers[uid];
     if (user && user.remoteAudioTrack) {
         try {
-            // Arrêter ou démarrer la track audio
             if (user.remoteAudioTrack.isPlaying) {
-                user.remoteAudioTrack.stop();
+                await user.remoteAudioTrack.stop();
+                document.getElementById(`mic-control-${uid}`).innerHTML = '<i class="fas fa-microphone-slash"></i> Micro';
             } else {
-                user.remoteAudioTrack.play();
+                await user.remoteAudioTrack.play();
+                document.getElementById(`mic-control-${uid}`).innerHTML = '<i class="fas fa-microphone"></i> Micro';
             }
-
-            // Mettre à jour l'interface
-            const micButton = document.getElementById(`mic-control-${uid}`);
-            if (micButton) {
-                micButton.classList.toggle('active');
-                micButton.innerHTML = micButton.classList.contains('active') ?
-                    '<i class="fas fa-microphone-slash"></i> Micro' :
-                    '<i class="fas fa-microphone"></i> Micro';
-            }
-
             console.log(`Micro ${user.remoteAudioTrack.isPlaying ? 'activé' : 'désactivé'} pour l'utilisateur ${uid}`);
         } catch (error) {
             console.error('Erreur lors de la tentative de basculer le micro:', error);
@@ -322,22 +319,13 @@ async function toggleRemoteUserCamera(uid) {
     const user = remoteUsers[uid];
     if (user && user.remoteVideoTrack) {
         try {
-            // Arrêter ou démarrer la track vidéo
             if (user.remoteVideoTrack.isPlaying) {
-                user.remoteVideoTrack.stop();
+                await user.remoteVideoTrack.stop();
+                document.getElementById(`cam-control-${uid}`).innerHTML = '<i class="fas fa-video-slash"></i> Caméra';
             } else {
-                user.remoteVideoTrack.play(`user-${uid}`);
+                await user.remoteVideoTrack.play(`user-${uid}`);
+                document.getElementById(`cam-control-${uid}`).innerHTML = '<i class="fas fa-video"></i> Caméra';
             }
-
-            // Mettre à jour l'interface
-            const camButton = document.getElementById(`cam-control-${uid}`);
-            if (camButton) {
-                camButton.classList.toggle('active');
-                camButton.innerHTML = camButton.classList.contains('active') ?
-                    '<i class="fas fa-video-slash"></i> Caméra' :
-                    '<i class="fas fa-video"></i> Caméra';
-            }
-
             console.log(`Caméra ${user.remoteVideoTrack.isPlaying ? 'activée' : 'désactivée'} pour l'utilisateur ${uid}`);
         } catch (error) {
             console.error('Erreur lors de la tentative de basculer la caméra:', error);
